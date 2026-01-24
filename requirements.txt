@@ -1,0 +1,12 @@
+# Communication with Arduino
+pyserial
+
+# Inter-process Communication (Node to Node)
+pyzmq
+
+# HTTP Requests (for LM Studio API)
+requests
+
+# Computer Vision & Image Processing
+opencv-python
+Pillow
