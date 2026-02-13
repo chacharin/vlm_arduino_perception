@@ -1,35 +1,133 @@
-# 🛠️ Virtual Proprioception: VLM-Grip Integration
+# 🛠️ Virtual Proprioception: VLM--Grip Integration
 
-โปรเจกต์นี้คือการพัฒนาระบบ "Virtual Sensor" โดยการนำ Vision-Language Model (VLM) มาทำ System Integration ร่วมกับหุ่นยนต์แขนกลเพื่อตรวจจับการหยิบพลาด (Slippage) แบบ Real-time.
+ระบบนี้คือการพัฒนา **Virtual Proprioception** สำหรับหุ่นยนต์แขนกล
+โดยใช้\
+**Vision-Language Model (VLM)**
+เป็นเซนเซอร์เสมือนเพื่อตรวจจับการหยิบพลาด\
+(*slippage*) แบบกึ่ง real-time ผ่านกล้อง RGB ปกติ
 
----
+แนวคิดหลักคือ: แทนที่จะติดตั้ง force sensor หรือ tactile sensor เพิ่ม\
+เราใช้ AI วิเคราะห์ภาพ ณ จุดสำคัญของการเคลื่อนที่ แล้วตัดสินใจว่าจะ\
+**"ผ่านต่อ" หรือ "หยุดทันที"**
+
+------------------------------------------------------------------------
+
+## 🎯 Concept Overview
+
+หุ่นยนต์จะไม่วิเคราะห์ภาพตลอดเวลา แต่ใช้แนวคิด **Discrete Keyframe
+Monitoring**\
+กล่าวคือ ตรวจสอบเฉพาะจุด checkpoint ที่มีความเสี่ยงต่อการหลุดของวัตถุ\
+เพื่อลด latency และภาระของโมเดล
+
+ลูปการทำงานมี 3 ขั้น:
+
+1.  Robot เคลื่อนที่ถึง checkpoint → ส่ง `request_check`
+2.  Decision Node สั่งกล้อง capture และส่งภาพให้ VLM วิเคราะห์
+3.  ระบบตัดสินใจ `pass` หรือ `stop`
+
+------------------------------------------------------------------------
 
 ## 🏗️ System Architecture
-ระบบใช้โครงสร้างแบบ Node-based เพื่อจัดการกับ Latency และการประมวลผล.
 
-| Node | Language / Framework | Primary Function | Communication |
-| :--- | :--- | :--- | :--- |
-| **Perception Node** | Python + OpenCV + PyZMQ | จับภาพจากกล้องและ Query ข้อมูลจาก VLM ผ่าน LM Studio API. | ZMQ (Server - REP) |
-| **Decision Node** | Python + Tkinter + PyZMQ | ควบคุม Workflow หลัก, ตรวจสอบ Confidence Threshold และส่งคำสั่งควบคุมหุ่นยนต์. | Serial (UART) & ZMQ (Client) |
-| **Motion Control** | C++ (Arduino) | จัดการท่าทางหุ่นยนต์ตาม Motion Table และรอสัญญาณ Pass/Stop ที่จุด Checkpoint. | Serial @ 115200 Baud |
+### Perception Node
 
----
+-   Python + OpenCV + PyZMQ\
+-   จับภาพและ query VLM\
+-   ZMQ (REP server)
 
-## 🚀 Getting Started
+### Decision Node
 
-### 1. Prerequisites
-* **AI Engine**: [LM Studio](https://lmstudio.ai/) รันโมเดล `qwen/qwen3-vl-4b` (OpenAI-compatible API).
-* **Python Environment**: Python 3.9+ พร้อมติดตั้ง Libraries ใน `requirements.txt`.
-* **Hardware**: Arduino Uno, 4-DOF Robotic Arm, Generic RGB Web-camera.
+-   Python + Tkinter + PyZMQ\
+-   Logic หลัก + GUI + Threshold control\
+-   Serial (UART) + ZMQ (Client)
 
-### 2. Installation
-```bash
-cd VLM-Grip
+### Motion Control
 
-# Install dependencies
-pip install -r requirements.txt
+-   Arduino (C++)\
+-   ควบคุม servo + handshake\
+-   Serial @115200
 
----
+------------------------------------------------------------------------
 
+## 🔁 Handshake Protocol
 
+### 1️⃣ Trigger Phase
 
+เมื่อแขนกลถึง checkpoint ที่กำหนดไว้ใน firmware\
+Arduino ส่งข้อความ:
+
+    request_check
+
+### 2️⃣ Analysis Phase
+
+Decision Node รับ serial → ส่ง `CAPTURE` → Perception Node\
+Perception Node จับภาพ → เรียก VLM ผ่าน LM Studio API
+
+ตัวอย่างผลลัพธ์:
+
+``` json
+{
+  "object_present": true,
+  "confidence": 0.87
+}
+```
+
+### 3️⃣ Execution Phase
+
+หาก `object_present = true`\
+และ `confidence > CONFIDENCE_THRESHOLD`
+
+ส่ง:
+
+    pass
+
+หากไม่เข้าเงื่อนไข:
+
+    stop
+
+Arduino จะหยุดและ reset กลับตำแหน่ง Home
+
+------------------------------------------------------------------------
+
+## 🚀 Deployment Workflow
+
+1.  อัปโหลด `low_level_wait.ino` ไปยัง Arduino\
+2.  เปิด LM Studio และโหลดโมเดล `qwen/qwen3-vl-4b`\
+3.  Start Local Server ที่ Port 1234\
+4.  รัน `1perception_VLM.py`\
+5.  รัน `1decision_node.py`\
+6.  เลือก COM Port และ Connect Serial
+
+------------------------------------------------------------------------
+
+## ⚙️ Customization
+
+### 🔹 Confidence Threshold
+
+ปรับค่า `CONFIDENCE_THRESHOLD` ในไฟล์ `1decision_node.py`\
+ค่าเริ่มต้น = 80
+
+### 🔹 Keyframe Checkpoint
+
+สามารถแก้ไข checkpoint ใน `low_level_wait.ino` ภายในฟังก์ชัน `loop()`\
+ปัจจุบันใช้ Step 2, 3, 4, 5
+
+------------------------------------------------------------------------
+
+## 🧠 Design Philosophy
+
+ระบบนี้ตั้งอยู่บนสมมติฐานว่า\
+Vision model สามารถทำหน้าที่แทน tactile sensing ได้บางบริบท
+
+การประมวลผลแบบ event-driven มีประสิทธิภาพกว่า\
+real-time continuous streaming
+
+System integration สำคัญเทียบเท่าขนาดโมเดล
+
+------------------------------------------------------------------------
+
+## ⚠️ Safety Notes
+
+-   หาก confidence แกว่ง ควรลดความเร็วแขนกล\
+-   ตรวจสอบ latency ก่อนใช้งานจริง\
+-   หลีกเลี่ยงวัตถุหนักหรือมีความเสี่ยงโดยไม่มี stop mechanism สำรอง
