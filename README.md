@@ -31,20 +31,20 @@ Monitoring**\
 
 ### Perception Node
 
--   Python + OpenCV + PyZMQ\
--   จับภาพและ query VLM\
+-   Python + OpenCV + PyZMQ
+-   จับภาพและ query VLM
 -   ZMQ (REP server)
 
 ### Decision Node
 
--   Python + Tkinter + PyZMQ\
--   Logic หลัก + GUI + Threshold control\
+-   Python + Tkinter + PyZMQ
+-   Logic หลัก + GUI + Threshold control
 -   Serial (UART) + ZMQ (Client)
 
 ### Motion Control
 
--   Arduino (C++)\
--   ควบคุม servo + handshake\
+-   Arduino (C++)
+-   ควบคุม servo + handshake
 -   Serial @115200
 
 ------------------------------------------------------------------------
@@ -74,7 +74,7 @@ Perception Node จับภาพ → เรียก VLM ผ่าน LM Studi
 
 ### 3️⃣ Execution Phase
 
-หาก `object_present = true`\
+หาก `object_present = true`
 และ `confidence > CONFIDENCE_THRESHOLD`
 
 ส่ง:
@@ -91,12 +91,11 @@ Arduino จะหยุดและ reset กลับตำแหน่ง Home
 
 ## 🚀 Deployment Workflow
 
-1.  อัปโหลด `low_level_wait.ino` ไปยัง Arduino\
-2.  เปิด LM Studio และโหลดโมเดล `qwen/qwen3-vl-4b`\
-3.  Start Local Server ที่ Port 1234\
-4.  รัน `1perception_VLM.py`\
-5.  รัน `1decision_node.py`\
-6.  เลือก COM Port และ Connect Serial
+1.  อัปโหลด `low_level_wait.ino` ไปยัง Arduino
+2.  เปิด LM Studio และโหลดโมเดล `qwen/qwen3-vl-4b`
+3.  Start Local Server ที่ Port 1234
+4.  รัน `1perception_VLM.py`
+5.  รัน `1decision_node.py` (อย่าลืม Connect Serial และ เลือก COM Port )
 
 ------------------------------------------------------------------------
 
@@ -114,20 +113,4 @@ Arduino จะหยุดและ reset กลับตำแหน่ง Home
 
 ------------------------------------------------------------------------
 
-## 🧠 Design Philosophy
 
-ระบบนี้ตั้งอยู่บนสมมติฐานว่า\
-Vision model สามารถทำหน้าที่แทน tactile sensing ได้บางบริบท
-
-การประมวลผลแบบ event-driven มีประสิทธิภาพกว่า\
-real-time continuous streaming
-
-System integration สำคัญเทียบเท่าขนาดโมเดล
-
-------------------------------------------------------------------------
-
-## ⚠️ Safety Notes
-
--   หาก confidence แกว่ง ควรลดความเร็วแขนกล\
--   ตรวจสอบ latency ก่อนใช้งานจริง\
--   หลีกเลี่ยงวัตถุหนักหรือมีความเสี่ยงโดยไม่มี stop mechanism สำรอง
